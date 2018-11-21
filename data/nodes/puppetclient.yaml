@@ -1,0 +1,244 @@
+---
+role: role::puppetclient
+
+##################################################
+#
+# profile::build
+#
+# Build flags to control which build tasks are executed. Can be set at host of environment level
+#
+########################################
+
+l1_build_services: TRUE
+l1_build_networking: TRUE
+l1_build_groups: TRUE
+l1_build_users: TRUE
+l1_build_firewall: TRUE
+l1_build_yumrepos: TRUE
+l1_build_facts: TRUE
+l1_build_osupgrade: TRUE
+l1_build_sudoers: TRUE
+
+##################################################
+#
+# profile::build:l1:l1_services
+#
+# Management of system service status
+#
+########################################
+
+system::services:
+  ntpd:
+    ensure: 'running'
+    enable: 'true'
+
+##################################################
+#
+# profile::build:l1:l1_networking
+#
+# Management of : hosts file entries, static routes (including network service restart)
+#
+########################################
+
+system::hosts:
+  puppet:
+    ip: "10.0.0.3"
+    host_aliases: []
+  puppetclient:
+    ip: "10.0.0.4"
+    host_aliases: []
+  gitlab:
+    ip: "10.0.0.5"
+    host_aliases: []
+  ansible:
+    ip: "10.0.0.6"
+    host_aliases: []
+  gitlab2:
+    ip: "10.0.0.7"
+    host_aliases: []
+
+static_routes:
+  eth1:
+  - '10.0.0.1/24 via 10.0.0.1 dev eth1'
+  - '10.0.0.2/25 via 10.0.0.1 dev eth1'
+  eth2:
+  - '10.0.0.1/24 via 10.0.0.1 dev eth2'
+  - '10.0.0.2/25 via 10.0.0.1 dev eth2'
+  - '10.0.0.3/25 via 10.0.0.1 dev eth2'
+
+#interfaces:
+#  eth1:
+#    ipaddress: '10.0.0.1'
+#    type: 'Ethernet'
+#    BOOTPROTO=dhcp
+#    DEFROUTE=yes
+#    IPV4_FAILURE_FATAL=no
+#    NAME=enp0s8
+#    UUID=e44da42b-65ce-405b-b32c-0f407f93b54f
+#    DEVICE=enp0s8
+#    ONBOOT=yes
+#    ZONE=public
+#    PROXY_METHOD=none
+#    BROWSER_ONLY=no
+#    IPV6INIT=no
+#
+#  IPADDR=10.0.0.4
+#  MASK=255.255.255.0
+#  DEFROUTE=yes
+#  PEERDNS=yes
+#  PEERROUTES=yes
+#  IPV4_FAILURE_FATAL=no
+#  NAME=enp0s3
+#  UUID=31be0304-9974-4090-8758-da9b3b4f661d
+#  DEVICE=enp0s3
+#  ONBOOT=yes
+#  ZONE=public
+
+
+
+##################################################
+#
+# profile::build:l1:l1_groups
+#
+# Management of : local groups
+#
+########################################
+
+standard_group:
+  test_group:
+    gid: 30000
+  test_group2:
+    gid: 300001
+
+##################################################
+#
+# profile::build:l1:l1_users
+#
+# Management of : local users
+#
+########################################
+
+#standard user values come from users_and_groups.yaml - only here for local testing
+standard_user:
+  test_user:
+    uid: '20000'
+    password_max_age: '365'
+  test_user2:
+    uid: '20001'
+    password_max_age: '365'
+  dpdeploy:
+    uid: '20002'
+    password_max_age: '365'
+
+localusers:
+  - test_user
+  - test_user2
+  - dpdeploy
+
+localgroups:
+  - test_group
+  - test_group2
+
+##################################################
+#
+# profile::build:l1:l1_firewall
+#
+# Management of : zone configuration, adding of firewall service to zones and custom services
+#
+########################################
+
+firewalld::zones:
+  mgt:
+    ensure: present
+#    target: '%%REJECT%%'
+    target: 'ACCEPT'
+    purge_rich_rules: TRUE
+    purge_services: TRUE
+    purge_ports: TRUE
+
+  public:
+    interfaces: enp0s8
+
+firewalld::services:
+  ssh:
+    ensure: present
+    service: ssh
+    zone: mgt
+  dhcp:
+    ensure: absent
+    service: dhcp
+    zone: mgt
+
+##################################################
+#
+# profile::build:l1:l1_yumrepos
+#
+# Management of : yum repo delivery
+#
+########################################
+
+system::yumrepos:
+  'puppet6':
+    name:           'Puppet 6 Repository el 7 - Source'
+    baseurl:        'http://yum.puppetlabs.com/puppet6/el/7/SRPMS'
+    enabled:        '0'
+    gpgcheck:       '0'
+    gpgkey:         'file:///etc/pki/rpm-gpg/RPM-GPG-KEY-puppet6-release'
+    failovermethod: 'priority'
+
+##################################################
+#
+# profile::build:l1:l1_facts
+#
+# Management of : custom facts
+#
+########################################
+
+system::facts:
+  location:
+    value: 'CHS'
+
+##################################################
+#
+# profile::build:l1:l1_osupgrade
+#
+# Delivers the ability to perform OS upgrades from one release to another
+#
+########################################
+
+system::execs:
+  '/bin/yum -y update':
+  unless: '/bin/lsb_release -d | grep -w "7.3"'
+  onlyif: '/bin/lsb_release -d | grep -w "7.2"'
+
+##################################################
+#
+# profile::build:l1:l1_sudoers
+#
+# management of the sudoers access in /etc/sudoers.d. The DNS suffix will be appended.
+#
+########################################
+
+sudo_access:
+  gl_role_testers:
+  - 'ALL=(dpdeploy) NOPASSWD: ALL'
+  - 'ALL=(dpdeploy2) NOPASSWD: ALL'
+  gl_role_mark:
+  - 'ALL=(dpdeploy) NOPASSWD: ALL'
+
+#system::network::hostname: 'puppetclient'
+#system::network::gateway:  '10.0.0.1'
+##system::network::ipv6:     'TRUE'
+##system::network::zeroconf: 'TRUE'
+##system::network::dns:
+##  nameservers: [ '10.7.96.2', '10.7.96.2' ]
+##  domains:     [ 'domain.com', 'sub.domain.com' ]
+#system::network::interfaces:
+#  enp0s3:
+#    ipaddress: '10.0.0.4'
+#    netmask:   '255.255.255.0'
+#    type: 'Ethernet'
+#    name: 'enp0s3'
+##    routes:
+##      '10.0.0.0/8':
+#        via: '10.16.0.250'
